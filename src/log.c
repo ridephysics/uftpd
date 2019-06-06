@@ -34,7 +34,7 @@ int uftpd_loglvl(char *level)
 void uftpd_logit(int severity, const char *fmt, ...)
 {
 	FILE *file;
-        va_list args;
+	va_list args;
 
 	if (uftpd_loglevel == INTERNAL_NOPRI)
 		return;
@@ -44,7 +44,7 @@ void uftpd_logit(int severity, const char *fmt, ...)
 	else
 		file = stderr;
 
-        va_start(args, fmt);
+	va_start(args, fmt);
 	if (uftpd_do_syslog)
 		vsyslog(severity, fmt, args);
 	else if (severity <= uftpd_loglevel) {
@@ -53,7 +53,7 @@ void uftpd_logit(int severity, const char *fmt, ...)
 		vfprintf(file, fmt, args);
 		fflush(file);
 	}
-        va_end(args);
+	va_end(args);
 }
 
 /**
