@@ -18,10 +18,10 @@
 #define SYSLOG_NAMES
 #include "uftpd.h"
 
-int loglevel = LOG_NOTICE;
+int uftpd_loglevel = LOG_NOTICE;
 
 
-int loglvl(char *level)
+int uftpd_loglvl(char *level)
 {
 	for (int i = 0; prioritynames[i].c_name; i++) {
 		if (string_match(prioritynames[i].c_name, level))
@@ -31,12 +31,12 @@ int loglvl(char *level)
 	return atoi(level);
 }
 
-void logit(int severity, const char *fmt, ...)
+void uftpd_logit(int severity, const char *fmt, ...)
 {
 	FILE *file;
         va_list args;
 
-	if (loglevel == INTERNAL_NOPRI)
+	if (uftpd_loglevel == INTERNAL_NOPRI)
 		return;
 
 	if (severity > LOG_WARNING)
@@ -45,10 +45,10 @@ void logit(int severity, const char *fmt, ...)
 		file = stderr;
 
         va_start(args, fmt);
-	if (do_syslog)
+	if (uftpd_do_syslog)
 		vsyslog(severity, fmt, args);
-	else if (severity <= loglevel) {
-		if (loglevel == LOG_DEBUG)
+	else if (severity <= uftpd_loglevel) {
+		if (uftpd_loglevel == LOG_DEBUG)
 			fprintf(file, "%d> ", getpid());
 		vfprintf(file, fmt, args);
 		fflush(file);

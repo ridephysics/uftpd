@@ -173,7 +173,7 @@ static int open_data_connection(ctrl_t *ctrl)
 			return -1;
 		}
 
-		rc = set_nonblock(ctrl->data_sd);
+		rc = uftpd_set_nonblock(ctrl->data_sd);
 		if (rc != 0) {
 			ERR(errno, "Failed creating data socket");
 			close(ctrl->data_sd);
@@ -226,7 +226,7 @@ static int open_data_connection(ctrl_t *ctrl)
 			return -1;
 		}
 
-		rc = set_nonblock(ctrl->data_sd);
+		rc = uftpd_set_nonblock(ctrl->data_sd);
 		if (rc) {
 			ERR(errno, "Failed to make socket non-blocking");
 			close(ctrl->data_sd);
@@ -417,17 +417,17 @@ static void handle_CWD(ctrl_t *ctrl, char *path)
 	 * Some FTP clients, most notably Chrome, use CWD to check if an
 	 * entry is a file or directory.
 	 */
-	dir = compose_abspath(ctrl, path);
-	if (!dir || stat(dir, &st) || !S_ISDIR(st.st_mode) || strlen(home) > strlen(dir)) {
+	dir = uftpd_compose_abspath(ctrl, path);
+	if (!dir || stat(dir, &st) || !S_ISDIR(st.st_mode) || strlen(uftpd_home) > strlen(dir)) {
 		send_msg(ctrl->sd, "550 No such directory.\r\n");
 		return;
 	}
 
-	if (!chrooted) {
-		size_t len = strlen(home);
+	if (!uftpd_chrooted) {
+		size_t len = strlen(uftpd_home);
 
 		DBG("non-chrooted CWD, home:%s, dir:%s, len:%zd, dirlen:%zd",
-		    home, dir, len, strlen(dir));
+		    uftpd_home, dir, len, strlen(dir));
 		dir += len;
 	}
 
@@ -530,7 +530,7 @@ static const char *mlsd_type(char *name, int mode)
 	return S_ISDIR(mode) ? "dir" : "file";
 }
 
-void mlsd_fact(char fact, char *buf, size_t len, char *name, char *perms, struct stat *st)
+static void mlsd_fact(char fact, char *buf, size_t len, char *name, char *perms, struct stat *st)
 {
 	char size[20];
 
@@ -716,7 +716,7 @@ static void do_LIST(uev_t *w, void *arg, int events)
 
 		snprintf(cwd, sizeof(cwd), "%s%s%s", ctrl->file,
 			 ctrl->file[strlen(ctrl->file) - 1] == '/' ? "" : "/", name);
-		path = compose_path(ctrl, cwd);
+		path = uftpd_compose_path(ctrl, cwd);
 		if (!path) {
 		fail:
 			LOGIT(LOG_INFO, errno, "Failed reading status for %s", path ? path : name);
@@ -800,9 +800,9 @@ static void list(ctrl_t *ctrl, char *arg, int mode)
 	}
 
 	if (mode >= 2)
-		path = compose_abspath(ctrl, arg);
+		path = uftpd_compose_abspath(ctrl, arg);
 	else
-		path = compose_path(ctrl, arg);
+		path = uftpd_compose_path(ctrl, arg);
 	if (!path) {
 		send_msg(ctrl->sd, "550 No such file or directory.\r\n");
 		return;
@@ -927,7 +927,7 @@ static int do_PASV(ctrl_t *ctrl, char *arg, struct sockaddr *data, socklen_t *le
 		return 1;
 	}
 
-	rc = set_nonblock(ctrl->data_listen_sd);
+	rc = uftpd_set_nonblock(ctrl->data_listen_sd);
 	if (rc != 0) {
 		ERR(errno, "Failed opening data server socket");
 		send_msg(ctrl->sd, "426 Internal server error.\r\n");
@@ -1117,7 +1117,7 @@ static void handle_RETR(ctrl_t *ctrl, char *file)
 	char *path;
 	struct stat st;
 
-	path = compose_abspath(ctrl, file);
+	path = uftpd_compose_abspath(ctrl, file);
 	if (!path || stat(path, &st) || !S_ISREG(st.st_mode)) {
 		send_msg(ctrl->sd, "550 Not a regular file.\r\n");
 		return;
@@ -1168,7 +1168,7 @@ static void handle_MDTM(ctrl_t *ctrl, char *file)
 		file  = ptr;
 	}
 
-	path = compose_abspath(ctrl, file);
+	path = uftpd_compose_abspath(ctrl, file);
 	if (!path || stat(path, &st) || !S_ISREG(st.st_mode)) {
 		send_msg(ctrl->sd, "550 Not a regular file.\r\n");
 		return;
@@ -1259,7 +1259,7 @@ static void handle_STOR(ctrl_t *ctrl, char *file)
 	char *path;
 	int rc = 0;
 
-	path = compose_abspath(ctrl, file);
+	path = uftpd_compose_abspath(ctrl, file);
 	if (!path) {
 		ERR(errno, "Invalid path for %s", file);
 		goto fail;
@@ -1299,7 +1299,7 @@ static void handle_DELE(ctrl_t *ctrl, char *file)
 {
 	char *path;
 
-	path = compose_abspath(ctrl, file);
+	path = uftpd_compose_abspath(ctrl, file);
 	if (!path) {
 		ERR(errno, "Cannot find %s", file);
 		goto fail;
@@ -1322,7 +1322,7 @@ static void handle_MKD(ctrl_t *ctrl, char *arg)
 {
 	char *path;
 
-	path = compose_abspath(ctrl, arg);
+	path = uftpd_compose_abspath(ctrl, arg);
 	if (!path) {
 		ERR(errno, "Invalid path for %s", arg);
 		goto fail;
@@ -1392,7 +1392,7 @@ static void handle_SIZE(ctrl_t *ctrl, char *file)
 	size_t extralen = 0;
 	struct stat st;
 
-	path = compose_abspath(ctrl, file);
+	path = uftpd_compose_abspath(ctrl, file);
 	if (!path || stat(path, &st) || S_ISDIR(st.st_mode)) {
 		send_msg(ctrl->sd, "550 No such file, or argument is a directory.\r\n");
 		return;
@@ -1601,7 +1601,7 @@ static void ftp_command(ctrl_t *ctrl)
                 exit(1);
 	}
 
-	snprintf(ctrl->buf, ctrl->bufsz, "220 %s (%s) ready.\r\n", prognm, VERSION);
+	snprintf(ctrl->buf, ctrl->bufsz, "220 %s (%s) ready.\r\n", uftpd_prognm, VERSION);
 	send_msg(ctrl->sd, ctrl->buf);
 
 	uev_signal_init(ctrl->ctx, &sigterm_watcher, child_exit, NULL, SIGTERM);
@@ -1609,13 +1609,13 @@ static void ftp_command(ctrl_t *ctrl)
 	uev_run(ctrl->ctx, 0);
 }
 
-int ftp_session(uev_ctx_t *ctx, int sd)
+int uftpd_ftp_session(uev_ctx_t *ctx, int sd)
 {
 	int pid = 0;
 	ctrl_t *ctrl;
 	socklen_t len;
 
-	ctrl = new_session(ctx, sd, &pid);
+	ctrl = uftpd_new_session(ctx, sd, &pid);
 	if (!ctrl) {
 		if (pid < 0) {
 			shutdown(sd, SHUT_RDWR);
@@ -1630,14 +1630,14 @@ int ftp_session(uev_ctx_t *ctx, int sd)
 		ERR(errno, "Cannot determine our address");
 		goto fail;
 	}
-	convert_address(&ctrl->server_sa, ctrl->serveraddr, sizeof(ctrl->serveraddr));
+	uftpd_convert_address(&ctrl->server_sa, ctrl->serveraddr, sizeof(ctrl->serveraddr));
 
 	len = sizeof(ctrl->client_sa);
 	if (-1 == getpeername(sd, (struct sockaddr *)&ctrl->client_sa, &len)) {
 		ERR(errno, "Cannot determine client address");
 		goto fail;
 	}
-	convert_address(&ctrl->client_sa, ctrl->clientaddr, sizeof(ctrl->clientaddr));
+	uftpd_convert_address(&ctrl->client_sa, ctrl->clientaddr, sizeof(ctrl->clientaddr));
 
 	ctrl->type = TYPE_A;
 	ctrl->data_listen_sd = -1;
@@ -1651,7 +1651,7 @@ int ftp_session(uev_ctx_t *ctx, int sd)
 	ftp_command(ctrl);
 
 	DBG("Client exiting, bye");
-	exit(del_session(ctrl, 1));
+	exit(uftpd_del_session(ctrl, 1));
 fail:
 	free(ctrl);
 	shutdown(sd, SHUT_RDWR);

@@ -18,16 +18,16 @@
 #include "uftpd.h"
 
 /* Global daemon settings */
-char *prognm      = PACKAGE_NAME;
-char *home        = NULL;
-int   inetd       = 0;
-int   background  = 1;
-int   do_syslog   = 1;
-int   do_ftp      = FTP_DEFAULT_PORT;
-int   do_tftp     = TFTP_DEFAULT_PORT;
-int   do_insecure = 0;
-pid_t tftp_pid    = 0;
-struct passwd *pw = NULL;
+char *uftpd_prognm      = PACKAGE_NAME;
+char *uftpd_home        = NULL;
+int   uftpd_inetd       = 0;
+int   uftpd_do_syslog   = 1;
+struct passwd *uftpd_pw = NULL;
+static int   background  = 1;
+static int   do_ftp      = FTP_DEFAULT_PORT;
+static int   do_tftp     = TFTP_DEFAULT_PORT;
+static int   do_insecure = 0;
+static pid_t tftp_pid    = 0;
 
 /* Event contexts */
 static uev_t ftp_watcher;
@@ -47,12 +47,12 @@ static int version(void)
 
 static int usage(int code)
 {
-	int is_inetd = string_match(prognm, "in.");
+	int is_inetd = string_match(uftpd_prognm, "in.");
 
 	if (is_inetd)
-		printf("\nUsage: %s [-hv] [-l LEVEL] [PATH]\n\n", prognm);
+		printf("\nUsage: %s [-hv] [-l LEVEL] [PATH]\n\n", uftpd_prognm);
 	else
-		printf("\nUsage: %s [-hnsv] [-l LEVEL] [-o ftp=PORT,tftp=PORT,writable] [PATH]\n\n", prognm);
+		printf("\nUsage: %s [-hnsv] [-l LEVEL] [-o ftp=PORT,tftp=PORT,writable] [PATH]\n\n", uftpd_prognm);
 
 	printf("  -h         Show this help text\n"
 	       "  -l LEVEL   Set log level: none, err, info, notice (default), debug\n");
@@ -167,18 +167,18 @@ static int init(uev_ctx_t *ctx)
 		do_tftp = find_port(TFTP_SERVICE_NAME, TFTP_PROTO_NAME, TFTP_DEFAULT_PORT); 
 
 	/* Figure out FTP home directory */
-	if (!home) {
-		pw = getpwnam(FTP_DEFAULT_USER);
-		if (!pw) {
+	if (!uftpd_home) {
+		uftpd_pw = getpwnam(FTP_DEFAULT_USER);
+		if (!uftpd_pw) {
 			WARN(errno, "Cannot find user %s, falling back to %s as FTP root.",
 			     FTP_DEFAULT_USER, FTP_DEFAULT_HOME);
-			home = strdup(FTP_DEFAULT_HOME);
+			uftpd_home = strdup(FTP_DEFAULT_HOME);
 		} else {
-			home = strdup(pw->pw_dir);
+			uftpd_home = strdup(uftpd_pw->pw_dir);
 		}
 	}
 
-	if (!home || security_check(home))
+	if (!uftpd_home || security_check(uftpd_home))
 		return 1;
 
 	return uev_init(ctx);
@@ -200,7 +200,7 @@ static void ftp_cb(uev_t *w, void *arg, int events)
 		return;
 	}
 
-	ftp_session(arg, client);
+	uftpd_ftp_session(arg, client);
 }
 
 static void tftp_cb(uev_t *w, void *arg, int events)
@@ -212,7 +212,7 @@ static void tftp_cb(uev_t *w, void *arg, int events)
 		return;
 	}
 
-        tftp_pid = tftp_session(arg, w->fd);
+        tftp_pid = uftpd_tftp_session(arg, w->fd);
 	if (tftp_pid < 0) {
 		tftp_pid = 0;
 		uev_io_start(w);
@@ -227,7 +227,7 @@ static int start_service(uev_ctx_t *ctx, uev_t *w, uev_cb_t *cb, int port, int t
 		/* Disabled */
 		return 1;
 
-	sd = open_socket(port, type, desc);
+	sd = uftpd_open_socket(port, type, desc);
 	if (sd < 0) {
 		if (EACCES == errno)
 			WARN(0, "Not allowed to start %s service.%s",
@@ -259,7 +259,7 @@ static int serve_files(uev_ctx_t *ctx)
 	/* We're now up and running, save pid file. */
 	pidfile(NULL);
 
-	INFO("Serving files from %s ...", home);
+	INFO("Serving files from %s ...", uftpd_home);
 
 	return uev_run(ctx, 0);
 }
@@ -294,21 +294,21 @@ int main(int argc, char **argv)
 	};
 	uev_ctx_t ctx;
 
-	prognm = progname(argv[0]);
+	uftpd_prognm = progname(argv[0]);
 	while ((c = getopt(argc, argv, "hl:no:sv")) != EOF) {
 		switch (c) {
 		case 'h':
 			return usage(0);
 
 		case 'l':
-			loglevel = loglvl(optarg);
-			if (-1 == loglevel)
+			uftpd_loglevel = uftpd_loglvl(optarg);
+			if (-1 == uftpd_loglevel)
 				return usage(1);
 			break;
 
 		case 'n':
 			background = 0;
-			do_syslog--;
+			uftpd_do_syslog--;
 			break;
 
 		case 'o':
@@ -345,7 +345,7 @@ int main(int argc, char **argv)
 			break;
 
 		case 's':
-			do_syslog++;
+			uftpd_do_syslog++;
 			break;
 
 		case 'v':
@@ -357,31 +357,31 @@ int main(int argc, char **argv)
 	}
 
 	if (optind < argc) {
-		home = realpath(argv[optind], NULL);
-		if (!home) {
+		uftpd_home = realpath(argv[optind], NULL);
+		if (!uftpd_home) {
 			ERR(errno, "Invalid FTP root %s", argv[optind]);
 			return 1;
 		}
 	}
 
 	/* Inetd mode enforces foreground and syslog */
-	if (string_compare(prognm, "in.tftpd")) {
-		inetd      = 1;
+	if (string_compare(uftpd_prognm, "in.tftpd")) {
+		uftpd_inetd      = 1;
 		do_ftp     = 0;
 		do_tftp    = 1;
 		background = 0;
-		do_syslog  = 1;
-	} else if (string_compare(prognm, "in.ftpd")) {
-		inetd      = 1;
+		uftpd_do_syslog  = 1;
+	} else if (string_compare(uftpd_prognm, "in.ftpd")) {
+		uftpd_inetd      = 1;
 		do_ftp     = 1;
 		do_tftp    = 0;
 		background = 0;
-		do_syslog  = 1;
+		uftpd_do_syslog  = 1;
 	}
 
-	if (do_syslog) {
-		openlog(prognm, LOG_PID | LOG_NDELAY, LOG_FTP);
-		setlogmask(LOG_UPTO(loglevel));
+	if (uftpd_do_syslog) {
+		openlog(uftpd_prognm, LOG_PID | LOG_NDELAY, LOG_FTP);
+		setlogmask(LOG_UPTO(uftpd_loglevel));
 	}
 
 	DBG("Initializing ...");
@@ -390,20 +390,20 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	if (inetd) {
+	if (uftpd_inetd) {
 		int sd;
 		pid_t pid;
 
-		INFO("Started from inetd, serving files from %s ...", home);
+		INFO("Started from inetd, serving files from %s ...", uftpd_home);
 
 		/* Ensure socket is non-blocking */
 		sd = STDIN_FILENO;
 		(void)fcntl(sd, F_SETFL, fcntl(sd, F_GETFL, 0) | O_NONBLOCK);
 
 		if (do_tftp)
-			pid = tftp_session(&ctx, sd);
+			pid = uftpd_tftp_session(&ctx, sd);
 		else
-			pid = ftp_session(&ctx, sd);
+			pid = uftpd_ftp_session(&ctx, sd);
 
 		if (-1 == pid)
 			return 1;

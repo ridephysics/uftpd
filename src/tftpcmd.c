@@ -181,7 +181,7 @@ static int handle_RRQ(ctrl_t *ctrl)
 {
 	char *path;
 
-	path = compose_path(ctrl, ctrl->file);
+	path = uftpd_compose_path(ctrl, ctrl->file);
 	if (!path) {
 		ERR(errno, "%s: Invalid path to file %s", ctrl->clientaddr, ctrl->file);
 		return send_ERROR(ctrl, ENOTFOUND);
@@ -235,7 +235,7 @@ static void read_client_command(uev_t *w, void *arg, int events)
 		return;
 	}
 
-	convert_address(&ctrl->client_sa, ctrl->clientaddr, sizeof(ctrl->clientaddr));
+	uftpd_convert_address(&ctrl->client_sa, ctrl->clientaddr, sizeof(ctrl->clientaddr));
 	port   = ntohs(((struct sockaddr_in *)addr)->sin_port);
 	op     = ntohs(ctrl->th->th_opcode);
 	block  = ntohs(ctrl->th->th_block);
@@ -285,18 +285,18 @@ static void tftp_command(ctrl_t *ctrl)
 	uev_run(ctrl->ctx, 0);
 }
 
-int tftp_session(uev_ctx_t *ctx, int sd)
+int uftpd_tftp_session(uev_ctx_t *ctx, int sd)
 {
 	int pid = 0;
 	ctrl_t *ctrl;
 
-	ctrl = new_session(ctx, sd, &pid);
+	ctrl = uftpd_new_session(ctx, sd, &pid);
 	if (!ctrl)
 		return pid;
 
 	tftp_command(ctrl);
 
-	exit(del_session(ctrl, 0));
+	exit(uftpd_del_session(ctrl, 0));
 }
 
 /**

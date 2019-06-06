@@ -17,7 +17,7 @@
 
 #include "uftpd.h"
 
-int chrooted = 0;
+int uftpd_chrooted = 0;
 
 /* Protect against common directory traversal attacks, for details see
  * https://en.wikipedia.org/wiki/Directory_traversal_attack
@@ -30,7 +30,7 @@ int chrooted = 0;
  *
  * Forced dir ------> /srv/ftp/etc
  */
-char *compose_path(ctrl_t *ctrl, char *path)
+char *uftpd_compose_path(ctrl_t *ctrl, char *path)
 {
 	struct stat st;
 	static char rpath[PATH_MAX];
@@ -54,14 +54,14 @@ check:
 	while ((ptr = strstr(dir, "//")))
 		memmove(ptr, &ptr[1], strlen(&ptr[1]) + 1);
 
-	if (!chrooted) {
-		size_t len = strlen(home);
+	if (!uftpd_chrooted) {
+		size_t len = strlen(uftpd_home);
 
 		DBG("Server path from CWD: %s", dir);
-		if (len > 0 && home[len - 1] == '/')
+		if (len > 0 && uftpd_home[len - 1] == '/')
 			len--;
 		memmove(dir + len, dir, strlen(dir) + 1);
-		memcpy(dir, home, len);
+		memcpy(dir, uftpd_home, len);
 		DBG("Resulting non-chroot path: %s", dir);
 	}
 
@@ -92,15 +92,15 @@ check:
 		strlcat(rpath, name, sizeof(rpath));
 	}
 
-	if (!chrooted && strncmp(dir, home, strlen(home))) {
-		DBG("Failed non-chroot dir:%s vs home:%s", dir, home);
+	if (!uftpd_chrooted && strncmp(dir, uftpd_home, strlen(uftpd_home))) {
+		DBG("Failed non-chroot dir:%s vs home:%s", dir, uftpd_home);
 		return NULL;
 	}
 
 	return rpath;
 }
 
-char *compose_abspath(ctrl_t *ctrl, char *path)
+char *uftpd_compose_abspath(ctrl_t *ctrl, char *path)
 {
 	char *ptr;
 	char cwd[sizeof(ctrl->cwd)];
@@ -110,7 +110,7 @@ char *compose_abspath(ctrl_t *ctrl, char *path)
 		memset(ctrl->cwd, 0, sizeof(ctrl->cwd));
 	}
 
-	ptr = compose_path(ctrl, path);
+	ptr = uftpd_compose_path(ctrl, path);
 
 	if (path && path[0] == '/')
 		strlcpy(ctrl->cwd, cwd, sizeof(ctrl->cwd));
@@ -118,7 +118,7 @@ char *compose_abspath(ctrl_t *ctrl, char *path)
 	return ptr;
 }
 
-int set_nonblock(int fd)
+int uftpd_set_nonblock(int fd)
 {
 	int rc;
 	int flags;
@@ -134,7 +134,7 @@ int set_nonblock(int fd)
 	return 0;
 }
 
-int open_socket(int port, int type, char *desc)
+int uftpd_open_socket(int port, int type, char *desc)
 {
 	int sd, err, val = 1;
 	socklen_t len = sizeof(struct sockaddr);
@@ -146,7 +146,7 @@ int open_socket(int port, int type, char *desc)
 		return -1;
 	}
 
-	err = set_nonblock(sd);
+	err = uftpd_set_nonblock(sd);
 	if (err != 0) {
 		WARN(errno, "Failed making %s server socket non-blocking", desc);
 		close(sd);
@@ -180,7 +180,7 @@ int open_socket(int port, int type, char *desc)
 	return sd;
 }
 
-void convert_address(struct sockaddr_storage *ss, char *buf, size_t len)
+void uftpd_convert_address(struct sockaddr_storage *ss, char *buf, size_t len)
 {
 	switch (ss->ss_family) {
 	case AF_INET:
@@ -204,13 +204,13 @@ static void inactivity_cb(uev_t *w, void *arg, int events)
 	uev_exit(ctx);
 }
 
-ctrl_t *new_session(uev_ctx_t *ctx, int sd, int *rc)
+ctrl_t *uftpd_new_session(uev_ctx_t *ctx, int sd, int *rc)
 {
 	int err;
 	ctrl_t *ctrl = NULL;
 	static int privs_dropped = 0;
 
-	if (!inetd) {
+	if (!uftpd_inetd) {
 		pid_t pid = fork();
 
 		if (pid) {
@@ -234,7 +234,7 @@ ctrl_t *new_session(uev_ctx_t *ctx, int sd, int *rc)
 		uev_init(ctx);
 	}
 
-	err = set_nonblock(sd);
+	err = uftpd_set_nonblock(sd);
 	if (err) {
 		ERR(errno, "Failed to make session socket non-blocking");
 		goto fail;
@@ -251,33 +251,33 @@ ctrl_t *new_session(uev_ctx_t *ctx, int sd, int *rc)
 	strlcpy(ctrl->cwd, "/", sizeof(ctrl->cwd));
 
 	/* Chroot to FTP root */
-	if (!chrooted && geteuid() == 0) {
-		if (chroot(home) || chdir("/")) {
-			ERR(errno, "Failed chrooting to FTP root, %s, aborting", home);
+	if (!uftpd_chrooted && geteuid() == 0) {
+		if (chroot(uftpd_home) || chdir("/")) {
+			ERR(errno, "Failed chrooting to FTP root, %s, aborting", uftpd_home);
 			goto fail;
 		}
-		chrooted = 1;
-	} else if (!chrooted) {
-		if (chdir(home)) {
-			WARN(errno, "Failed changing to FTP root, %s, aborting", home);
+		uftpd_chrooted = 1;
+	} else if (!uftpd_chrooted) {
+		if (chdir(uftpd_home)) {
+			WARN(errno, "Failed changing to FTP root, %s, aborting", uftpd_home);
 			goto fail;
 		}
 	}
 
 	/* If ftp user exists and we're running as root we can drop privs */
-	if (!privs_dropped && pw && geteuid() == 0) {
+	if (!privs_dropped && uftpd_pw && geteuid() == 0) {
 		int fail1, fail2;
 
-		initgroups(pw->pw_name, pw->pw_gid);
-		if ((fail1 = setegid(pw->pw_gid)))
-			WARN(errno, "Failed dropping group privileges to gid %d", pw->pw_gid);
-		if ((fail2 = seteuid(pw->pw_uid)))
-			WARN(errno, "Failed dropping user privileges to uid %d", pw->pw_uid);
+		initgroups(uftpd_pw->pw_name, uftpd_pw->pw_gid);
+		if ((fail1 = setegid(uftpd_pw->pw_gid)))
+			WARN(errno, "Failed dropping group privileges to gid %d", uftpd_pw->pw_gid);
+		if ((fail2 = seteuid(uftpd_pw->pw_uid)))
+			WARN(errno, "Failed dropping user privileges to uid %d", uftpd_pw->pw_uid);
 
-		setenv("HOME", pw->pw_dir, 1);
+		setenv("HOME", uftpd_pw->pw_dir, 1);
 
 		if (!fail1 && !fail2)
-			INFO("Successfully dropped privilges to %d:%d (uid:gid)", pw->pw_uid, pw->pw_gid);
+			INFO("Successfully dropped privilges to %d:%d (uid:gid)", uftpd_pw->pw_uid, uftpd_pw->pw_gid);
 
 		/* On failure, we tried at least.  Only warn once. */
 		privs_dropped = 1;
@@ -290,14 +290,14 @@ ctrl_t *new_session(uev_ctx_t *ctx, int sd, int *rc)
 fail:
 	if (ctrl)
 		free(ctrl);
-	if (!inetd)
+	if (!uftpd_inetd)
 		free(ctx);
 	*rc = -1;
 
 	return NULL;
 }
 
-int del_session(ctrl_t *ctrl, int isftp)
+int uftpd_del_session(ctrl_t *ctrl, int isftp)
 {
 	DBG("%sFTP Client session ended.", isftp ? "": "T" );
 
@@ -322,7 +322,7 @@ int del_session(ctrl_t *ctrl, int isftp)
 	if (ctrl->buf)
 		free(ctrl->buf);
 
-	if (!inetd && ctrl->ctx)
+	if (!uftpd_inetd && ctrl->ctx)
 		free(ctrl->ctx);
 	free(ctrl);
 

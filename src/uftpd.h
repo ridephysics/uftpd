@@ -75,12 +75,12 @@
 #define LOGIT(severity, code, fmt, args...)				\
 	do {								\
 		if (code)						\
-			logit(severity, fmt ". Error %d: %s%s",		\
+			uftpd_logit(severity, fmt ". Error %d: %s%s",		\
 			      ##args, code, strerror(code),		\
-			      do_syslog ? "" : "\n");			\
+			      uftpd_do_syslog ? "" : "\n");			\
 		else							\
-			logit(severity, fmt "%s", ##args,		\
-			      do_syslog ? "" : "\n");			\
+			uftpd_logit(severity, fmt "%s", ##args,		\
+			      uftpd_do_syslog ? "" : "\n");			\
 	} while (0)
 #define ERR(code, fmt, args...)  LOGIT(LOG_ERR, code, fmt, ##args)
 #define WARN(code, fmt, args...) LOGIT(LOG_WARNING, code, fmt, ##args)
@@ -88,16 +88,13 @@
 #define INFO(fmt, args...)       LOGIT(LOG_INFO, 0, fmt, ##args)
 #define DBG(fmt, args...)        LOGIT(LOG_DEBUG, 0, fmt, ##args)
 
-extern char *prognm;
-extern char *home;		/* Server root/home directory       */
-extern int   inetd;             /* Bool: conflicts with daemonize   */
-extern int   background;	/* Bool: conflicts with inetd       */
-extern int   chrooted;		/* Bool: are we chrooted?           */
-extern int   loglevel;
-extern int   do_syslog;         /* Bool: False at daemon start      */
-extern int   do_ftp;            /* Port: FTP port, or disabled      */
-extern int   do_tftp;           /* Port: TFTP port, or disabled     */
-extern struct passwd *pw;       /* FTP user's passwd entry          */
+extern char *uftpd_prognm;
+extern char *uftpd_home;		/* Server root/home directory       */
+extern int   uftpd_inetd;             /* Bool: conflicts with daemonize   */
+extern int   uftpd_chrooted;		/* Bool: are we chrooted?           */
+extern int   uftpd_loglevel;
+extern int   uftpd_do_syslog;         /* Bool: False at daemon start      */
+extern struct passwd *uftpd_pw;       /* FTP user's passwd entry          */
 
 typedef struct tftphdr tftp_t;
 
@@ -151,20 +148,20 @@ typedef struct {
 	int  data_port;
 } ctrl_t;
 
-ctrl_t *new_session(uev_ctx_t *ctx, int sd, int *rc);
-int     del_session(ctrl_t *ctrl, int isftp);
+ctrl_t *uftpd_new_session(uev_ctx_t *ctx, int sd, int *rc);
+int     uftpd_del_session(ctrl_t *ctrl, int isftp);
 
-int     ftp_session(uev_ctx_t *ctx, int client);
-int     tftp_session(uev_ctx_t *ctx, int client);
+int     uftpd_ftp_session(uev_ctx_t *ctx, int client);
+int     uftpd_tftp_session(uev_ctx_t *ctx, int client);
 
-char   *compose_path(ctrl_t *ctrl, char *path);
-char   *compose_abspath(ctrl_t *ctrl, char *path);
-int     set_nonblock(int fd);
-int     open_socket(int port, int type, char *desc);
-void    convert_address(struct sockaddr_storage *ss, char *buf, size_t len);
+char   *uftpd_compose_path(ctrl_t *ctrl, char *path);
+char   *uftpd_compose_abspath(ctrl_t *ctrl, char *path);
+int     uftpd_set_nonblock(int fd);
+int     uftpd_open_socket(int port, int type, char *desc);
+void    uftpd_convert_address(struct sockaddr_storage *ss, char *buf, size_t len);
 
-int     loglvl(char *level);
-void    logit(int severity, const char *fmt, ...);
+int     uftpd_loglvl(char *level);
+void    uftpd_logit(int severity, const char *fmt, ...);
 
 #endif  /* UFTPD_H_ */
 
