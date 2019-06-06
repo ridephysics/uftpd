@@ -340,6 +340,17 @@ int uftpd_del_session(ctrl_t *ctrl, int isftp)
 	if (!uftpd_inetd && ctrl->ctx)
 		free(ctrl->ctx);
 #endif
+
+	if (ctrl->file)
+		free(ctrl->file);
+
+	if (ctrl->fp)
+		fclose(ctrl->fp);
+
+	uev_timer_stop(&ctrl->timeout_watcher);
+	uev_io_stop(&ctrl->data_watcher);
+	uev_io_stop(&ctrl->io_watcher);
+
 	free(ctrl);
 
 	return 0;
