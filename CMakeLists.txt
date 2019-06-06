@@ -3,7 +3,6 @@ set(COMPONENT_SRCS
     src/ftpcmd.c
     src/uftpd_embedded.c
     src/uftpd.h
-    src/log.c
 )
 set(COMPONENT_ADD_INCLUDEDIRS
     src/

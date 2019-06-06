@@ -51,6 +51,16 @@
 #include <unistd.h>
 
 #ifdef UFTPD_EMBEDDED
+#ifdef ESP_PLATFORM
+#include <esp_log.h>
+
+#define	LOG_ERR ESP_LOG_ERROR
+#define	LOG_WARNING ESP_LOG_WARN
+#define	LOG_NOTICE ESP_LOG_INFO
+#define	LOG_INFO ESP_LOG_INFO
+#define	LOG_DEBUG ESP_LOG_DEBUG
+
+#else
 #define	LOG_EMERG	0	/* system is unusable */
 #define	LOG_ALERT	1	/* action must be taken immediately */
 #define	LOG_CRIT	2	/* critical conditions */
@@ -61,6 +71,7 @@
 #define	LOG_DEBUG	7	/* debug-level messages */
 
 #define	INTERNAL_NOPRI	0x10	/* the "no priority" priority */
+#endif
 
 #define VERSION "2.8"
 
@@ -95,14 +106,24 @@
 /* TFTP Minimum segment size, specific to uftpd */
 #define MIN_SEGSIZE       32
 
+#define UFTPD_LOG_TAG "uftpd"
+
+#ifdef ESP_PLATFORM
+#define _uftpd_logit(severity, tag, fmt, args...) \
+	ESP_LOG_LEVEL(severity, tag, fmt, ##args)
+#else
+#define _uftpd_logit(severity, tag, fmt, args...) \
+	uftpd_logit(severity, fmt, ##args)
+#endif
+
 #define LOGIT(severity, code, fmt, args...)				\
 	do {								\
 		if (code)						\
-			uftpd_logit(severity, fmt ". Error %d: %s%s",		\
+			_uftpd_logit(severity, UFTPD_LOG_TAG, fmt ". Error %d: %s%s",		\
 			      ##args, code, strerror(code),		\
 			      uftpd_do_syslog ? "" : "\n");			\
 		else							\
-			uftpd_logit(severity, fmt "%s", ##args,		\
+			_uftpd_logit(severity, UFTPD_LOG_TAG, fmt "%s", ##args,		\
 			      uftpd_do_syslog ? "" : "\n");			\
 	} while (0)
 #define ERR(code, fmt, args...)  LOGIT(LOG_ERR, code, fmt, ##args)

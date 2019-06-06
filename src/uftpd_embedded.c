@@ -18,7 +18,7 @@
 #include "uftpd.h"
 
 char *uftpd_prognm = "uftpd";
-int uftpd_do_syslog = 0;
+int uftpd_do_syslog = 1;
 
 /* Event contexts */
 static uev_t ftp_watcher;
@@ -95,7 +95,6 @@ static int serve_files(uev_ctx_t *ctx)
 
 int uftpd_start(uev_ctx_t *ctx)
 {
-	uftpd_loglevel = LOG_DEBUG;
 	return serve_files(ctx);
 }
 
