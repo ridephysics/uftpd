@@ -194,6 +194,7 @@ static int open_data_connection(ctrl_t *ctrl)
 
 	/* Previous PASV command, accept connect from client */
 	if (ctrl->data_listen_sd > 0) {
+		int rc;
 		const int const_int_1 = 1;
 		int retries = 3;
 		char client_ip[100];
@@ -210,8 +211,19 @@ static int open_data_connection(ctrl_t *ctrl)
 			return -1;
 		}
 
-		setsockopt(ctrl->data_sd, SOL_SOCKET, SO_KEEPALIVE, &const_int_1, sizeof(const_int_1));
-		set_nonblock(ctrl->data_sd);
+		rc = setsockopt(ctrl->data_sd, SOL_SOCKET, SO_KEEPALIVE, &const_int_1, sizeof(const_int_1));
+		if (rc) {
+			ERR(errno, "Failed to set keepalive");
+			close(ctrl->data_sd);
+			return -1;
+		}
+
+		rc = set_nonblock(ctrl->data_sd);
+		if (rc) {
+			ERR(errno, "Failed to make socket non-blocking");
+			close(ctrl->data_sd);
+			return -1;
+		}
 
 		inet_ntop(AF_INET, &(sin.sin_addr), client_ip, INET_ADDRSTRLEN);
 		DBG("Client PASV data connection from %s:%d", client_ip, ntohs(sin.sin_port));
