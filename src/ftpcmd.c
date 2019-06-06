@@ -151,7 +151,7 @@ static int recv_msg(int sd, char *msg, size_t len, char **cmd, char **argument)
 		*ptr = 0;
 
 	/* Convert command to std ftp upper case, issue #18 */
-	for (ptr = msg; *ptr; ++ptr) *ptr = toupper(*ptr);
+	for (ptr = msg; *ptr; ++ptr) *ptr = toupper((int)(*ptr));
 
 	DBG("Recv: %s %s", *cmd, *argument ?: "");
 
@@ -775,11 +775,11 @@ static void list(ctrl_t *ctrl, char *arg, int mode)
 		/* Check if client sends ls arguments ... */
 		ptr = arg;
 		while (*ptr) {
-			if (isspace(*ptr))
+			if (isspace((int)(*ptr)))
 				ptr++;
 
 			if (*ptr == '-') {
-				while (*ptr && !isspace(*ptr))
+				while (*ptr && !isspace((int)(*ptr)))
 					ptr++;
 			}
 
