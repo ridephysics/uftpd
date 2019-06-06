@@ -184,6 +184,7 @@ char   *uftpd_compose_abspath(ctrl_t *ctrl, char *path);
 int     uftpd_set_nonblock(int fd);
 int     uftpd_open_socket(int port, int type, char *desc);
 void    uftpd_convert_address(struct sockaddr_storage *ss, char *buf, size_t len);
+int     uftpd_poll_write(int fd, int timeout_ms);
 
 #ifndef UFTPD_EMBEDDED
 int     uftpd_loglvl(char *level);

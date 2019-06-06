@@ -67,6 +67,13 @@ static int send_msg(int sd, char *msg)
 		int result = send(sd, msg + n, l, 0);
 
 		if (result < 0) {
+			if (errno == EINTR)
+				continue;
+			if (errno == EAGAIN || errno == EWOULDBLOCK) {
+				result = uftpd_poll_write(sd, 5000);
+				if (result >= 0)
+					continue;
+			}
 			ERR(errno, "Failed sending message to client");
 			return 1;
 		}
@@ -683,6 +690,7 @@ static void do_LIST(uev_t *w, void *arg, int events)
 	struct timeval tv;
 	ssize_t bytes;
 	char buf[BUFFER_SIZE] = { 0 };
+	int rc;
 
 	if (events & (UEV_ERROR | UEV_HUP)) {
 		uev_io_start(w);
@@ -741,12 +749,24 @@ static void do_LIST(uev_t *w, void *arg, int events)
 		DBG("LIST %s", buf);
 		free(entry);
 
+again:
 		bytes = send(ctrl->data_sd, buf, strlen(buf), 0);
 		if (-1 == bytes) {
 			if (ECONNRESET == errno)
 				DBG("Connection reset by client.");
-			else
+			else if (errno == EINTR)
+				goto again;
+			else if (errno == EAGAIN || errno == EWOULDBLOCK) {
+				rc = uftpd_poll_write(ctrl->data_sd, 5000);
+				if (rc >= 0)
+					goto again;
+
+				goto sendfail;
+			}
+			else {
+			sendfail:
 				ERR(errno, "Failed sending file %s to client", ctrl->file);
+			}
 
 			while (ctrl->i < ctrl->d_num) {
 				struct dirent *entry = ctrl->d[ctrl->i++];
@@ -1029,6 +1049,7 @@ static void do_RETR(uev_t *w, void *arg, int events)
 	ssize_t bytes;
 	size_t num;
 	char buf[BUFFER_SIZE];
+	int rc;
 
 	if (events & (UEV_ERROR | UEV_HUP)) {
 		DBG("error on data_sd ...");
@@ -1061,12 +1082,24 @@ static void do_RETR(uev_t *w, void *arg, int events)
 		ctrl->tv.tv_sec = tv.tv_sec;
 	}
 
+again:
 	bytes = send(ctrl->data_sd, buf, num, 0);
 	if (-1 == bytes) {
 		if (ECONNRESET == errno)
 			DBG("Connection reset by client.");
-		else
+		else if (errno == EINTR)
+			goto again;
+		else if (errno == EAGAIN || errno == EWOULDBLOCK) {
+			rc = uftpd_poll_write(ctrl->data_sd, 5000);
+			if (rc >= 0)
+				goto again;
+
+			goto sendfail;
+		}
+		else {
+		sendfail:
 			ERR(errno, "Failed sending file %s to client", ctrl->file);
+		}
 
 		do_abort(ctrl);
 		send_msg(ctrl->sd, "426 TCP connection was established but then broken!\r\n");

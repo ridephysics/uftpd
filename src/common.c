@@ -356,6 +356,22 @@ int uftpd_del_session(ctrl_t *ctrl, int isftp)
 	return 0;
 }
 
+static void ms_to_timeval(int timeout_ms, struct timeval *tv)
+{
+    tv->tv_sec = timeout_ms / 1000;
+    tv->tv_usec = (timeout_ms - (tv->tv_sec * 1000)) * 1000;
+}
+
+int uftpd_poll_write(int fd, int timeout_ms)
+{
+    fd_set writeset;
+    FD_ZERO(&writeset);
+    FD_SET(fd, &writeset);
+    struct timeval timeout;
+    ms_to_timeval(timeout_ms, &timeout);
+    return select(fd + 1, NULL, &writeset, NULL, &timeout);
+}
+
 /**
  * Local Variables:
  *  indent-tabs-mode: t
