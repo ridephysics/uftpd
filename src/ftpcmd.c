@@ -678,7 +678,7 @@ static void do_LIST(uev_t *w, void *arg, int events)
 	ssize_t bytes;
 	char buf[BUFFER_SIZE] = { 0 };
 
-	if (UEV_ERROR == events || UEV_HUP == events) {
+	if (events & (UEV_ERROR | UEV_HUP)) {
 		uev_io_start(w);
 		return;
 	}
@@ -853,7 +853,7 @@ static void do_pasv_connection(uev_t *w, void *arg, int events)
 	ctrl_t *ctrl = (ctrl_t *)arg;
 	int rc = 0;
 
-	if (UEV_ERROR == events || UEV_HUP == events) {
+	if (events & (UEV_ERROR | UEV_HUP)) {
 		DBG("error on data_listen_sd ...");
 		uev_io_start(w);
 		return;
@@ -1024,7 +1024,7 @@ static void do_RETR(uev_t *w, void *arg, int events)
 	size_t num;
 	char buf[BUFFER_SIZE];
 
-	if (UEV_ERROR == events || UEV_HUP == events) {
+	if (events & (UEV_ERROR | UEV_HUP)) {
 		DBG("error on data_sd ...");
 		uev_io_start(w);
 		return;
@@ -1211,7 +1211,7 @@ static void do_STOR(uev_t *w, void *arg, int events)
 	size_t num;
 	char buf[BUFFER_SIZE];
 
-	if (UEV_ERROR == events || UEV_HUP == events) {
+	if (events & (UEV_ERROR | UEV_HUP)) {
 		DBG("error on data_sd ...");
 		uev_io_start(w);
 		return;
@@ -1558,7 +1558,7 @@ static void read_client_command(uev_t *w, void *arg, int events)
 	ctrl_t *ctrl = (ctrl_t *)arg;
 	ftp_cmd_t *cmd;
 
-	if (UEV_ERROR == events || UEV_HUP == events) {
+	if (events & (UEV_ERROR | UEV_HUP)) {
 		uev_io_start(w);
 		return;
 	}

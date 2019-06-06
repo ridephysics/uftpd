@@ -188,7 +188,7 @@ static void ftp_cb(uev_t *w, void *arg, int events)
 {
         int client;
 
-	if (UEV_ERROR == events || UEV_HUP == events) {
+	if (events & (UEV_ERROR | UEV_HUP)) {
 		uev_io_stop(w);
 		close(w->fd);
 		return;
@@ -207,7 +207,7 @@ static void tftp_cb(uev_t *w, void *arg, int events)
 {
 	uev_io_stop(w);
 
-	if (UEV_ERROR == events || UEV_HUP == events) {
+	if (events & (UEV_ERROR | UEV_HUP)) {
 		close(w->fd);
 		return;
 	}
