@@ -120,13 +120,18 @@ char *compose_abspath(ctrl_t *ctrl, char *path)
 
 int set_nonblock(int fd)
 {
+	int rc;
 	int flags;
 
 	flags = fcntl(fd, F_GETFL, 0);
-	if (!flags)
-		(void)fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+	if (flags < 0)
+		return -1;
 
-	return fd;
+	rc = fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+	if (rc < 0)
+		return -1;
+
+	return 0;
 }
 
 int open_socket(int port, int type, char *desc)
@@ -194,6 +199,7 @@ static void inactivity_cb(uev_t *w, void *arg, int events)
 
 ctrl_t *new_session(uev_ctx_t *ctx, int sd, int *rc)
 {
+	int err;
 	ctrl_t *ctrl = NULL;
 	static int privs_dropped = 0;
 
@@ -221,13 +227,19 @@ ctrl_t *new_session(uev_ctx_t *ctx, int sd, int *rc)
 		uev_init(ctx);
 	}
 
+	err = set_nonblock(sd);
+	if (err) {
+		ERR(errno, "Failed to make session socket non-blocking");
+		goto fail;
+	}
+
 	ctrl = calloc(1, sizeof(ctrl_t));
 	if (!ctrl) {
 		ERR(errno, "Failed allocating session context");
 		goto fail;
 	}
 
-	ctrl->sd = set_nonblock(sd);
+	ctrl->sd = sd;
 	ctrl->ctx = ctx;
 	strlcpy(ctrl->cwd, "/", sizeof(ctrl->cwd));
 
