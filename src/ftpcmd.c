@@ -167,9 +167,17 @@ static int open_data_connection(ctrl_t *ctrl)
 	if (ctrl->data_address[0]) {
 		int rc;
 
-		ctrl->data_sd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
+		ctrl->data_sd = socket(AF_INET, SOCK_STREAM, 0);
 		if (-1 == ctrl->data_sd) {
 			ERR(errno, "Failed creating data socket");
+			return -1;
+		}
+
+		rc = set_nonblock(ctrl->data_sd);
+		if (rc != 0) {
+			ERR(errno, "Failed creating data socket");
+			close(ctrl->data_sd);
+			ctrl->data_sd = -1;
 			return -1;
 		}
 
@@ -901,6 +909,7 @@ static void do_pasv_connection(uev_t *w, void *arg, int events)
 
 static int do_PASV(ctrl_t *ctrl, char *arg, struct sockaddr *data, socklen_t *len)
 {
+	int rc;
 	struct sockaddr_in server;
 
 	if (ctrl->data_sd > 0) {
@@ -911,10 +920,19 @@ static int do_PASV(ctrl_t *ctrl, char *arg, struct sockaddr *data, socklen_t *le
 	if (ctrl->data_listen_sd > 0)
 		close(ctrl->data_listen_sd);
 
-	ctrl->data_listen_sd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
+	ctrl->data_listen_sd = socket(AF_INET, SOCK_STREAM, 0);
 	if (ctrl->data_listen_sd < 0) {
 		ERR(errno, "Failed opening data server socket");
 		send_msg(ctrl->sd, "426 Internal server error.\r\n");
+		return 1;
+	}
+
+	rc = set_nonblock(ctrl->data_listen_sd);
+	if (rc != 0) {
+		ERR(errno, "Failed opening data server socket");
+		send_msg(ctrl->sd, "426 Internal server error.\r\n");
+		close(ctrl->data_listen_sd);
+		ctrl->data_listen_sd = -1;
 		return 1;
 	}
 

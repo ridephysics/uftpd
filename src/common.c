@@ -140,9 +140,16 @@ int open_socket(int port, int type, char *desc)
 	socklen_t len = sizeof(struct sockaddr);
 	struct sockaddr_in server;
 
-	sd = socket(AF_INET, type | SOCK_NONBLOCK, 0);
+	sd = socket(AF_INET, type, 0);
 	if (sd < 0) {
 		WARN(errno, "Failed creating %s server socket", desc);
+		return -1;
+	}
+
+	err = set_nonblock(sd);
+	if (err != 0) {
+		WARN(errno, "Failed making %s server socket non-blocking", desc);
+		close(sd);
 		return -1;
 	}
 
