@@ -554,7 +554,7 @@ void mlsd_fact(char fact, char *buf, size_t len, char *name, char *perms, struct
 	case 's':
 		if (S_ISDIR(st->st_mode))
 			return;
-		snprintf(size, sizeof(size), "size=%" PRIu64, st->st_size);
+		snprintf(size, sizeof(size), "size=%" PRIu64, (uint64_t)st->st_size);
 		strlcat(buf, size, len);
 		break;
 
