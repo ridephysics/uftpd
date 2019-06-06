@@ -17,7 +17,9 @@
 
 #include "uftpd.h"
 
+#ifndef UFTPD_EMBEDDED
 int uftpd_chrooted = 0;
+#endif
 
 /* Protect against common directory traversal attacks, for details see
  * https://en.wikipedia.org/wiki/Directory_traversal_attack
@@ -54,6 +56,7 @@ check:
 	while ((ptr = strstr(dir, "//")))
 		memmove(ptr, &ptr[1], strlen(&ptr[1]) + 1);
 
+#ifndef UFTPD_EMBEDDED
 	if (!uftpd_chrooted) {
 		size_t len = strlen(uftpd_home);
 
@@ -64,6 +67,7 @@ check:
 		memcpy(dir, uftpd_home, len);
 		DBG("Resulting non-chroot path: %s", dir);
 	}
+#endif
 
 	/*
 	 * Handle directories slightly differently, since dirname() on a
@@ -92,10 +96,12 @@ check:
 		strlcat(rpath, name, sizeof(rpath));
 	}
 
+#ifndef UFTPD_EMBEDDED
 	if (!uftpd_chrooted && strncmp(dir, uftpd_home, strlen(uftpd_home))) {
 		DBG("Failed non-chroot dir:%s vs home:%s", dir, uftpd_home);
 		return NULL;
 	}
+#endif
 
 	return rpath;
 }
@@ -208,8 +214,11 @@ ctrl_t *uftpd_new_session(uev_ctx_t *ctx, int sd, int *rc)
 {
 	int err;
 	ctrl_t *ctrl = NULL;
+#ifndef UFTPD_EMBEDDED
 	static int privs_dropped = 0;
+#endif
 
+#ifndef UFTPD_EMBEDDED
 	if (!uftpd_inetd) {
 		pid_t pid = fork();
 
@@ -233,6 +242,7 @@ ctrl_t *uftpd_new_session(uev_ctx_t *ctx, int sd, int *rc)
 
 		uev_init(ctx);
 	}
+#endif
 
 	err = uftpd_set_nonblock(sd);
 	if (err) {
@@ -250,6 +260,7 @@ ctrl_t *uftpd_new_session(uev_ctx_t *ctx, int sd, int *rc)
 	ctrl->ctx = ctx;
 	strlcpy(ctrl->cwd, "/", sizeof(ctrl->cwd));
 
+#ifndef UFTPD_EMBEDDED
 	/* Chroot to FTP root */
 	if (!uftpd_chrooted && geteuid() == 0) {
 		if (chroot(uftpd_home) || chdir("/")) {
@@ -282,6 +293,7 @@ ctrl_t *uftpd_new_session(uev_ctx_t *ctx, int sd, int *rc)
 		/* On failure, we tried at least.  Only warn once. */
 		privs_dropped = 1;
 	}
+#endif
 
 	/* Session timeout handler */
 	uev_timer_init(ctrl->ctx, &ctrl->timeout_watcher, inactivity_cb, ctrl->ctx, INACTIVITY_TIMER, 0);
@@ -290,8 +302,10 @@ ctrl_t *uftpd_new_session(uev_ctx_t *ctx, int sd, int *rc)
 fail:
 	if (ctrl)
 		free(ctrl);
+#ifndef UFTPD_EMBEDDED
 	if (!uftpd_inetd)
 		free(ctx);
+#endif
 	*rc = -1;
 
 	return NULL;
@@ -322,8 +336,10 @@ int uftpd_del_session(ctrl_t *ctrl, int isftp)
 	if (ctrl->buf)
 		free(ctrl->buf);
 
+#ifndef UFTPD_EMBEDDED
 	if (!uftpd_inetd && ctrl->ctx)
 		free(ctrl->ctx);
+#endif
 	free(ctrl);
 
 	return 0;

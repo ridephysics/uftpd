@@ -21,6 +21,7 @@
 int uftpd_loglevel = LOG_NOTICE;
 
 
+#ifndef UFTPD_EMBEDDED
 int uftpd_loglvl(char *level)
 {
 	for (int i = 0; prioritynames[i].c_name; i++) {
@@ -30,6 +31,7 @@ int uftpd_loglvl(char *level)
 
 	return atoi(level);
 }
+#endif
 
 void uftpd_logit(int severity, const char *fmt, ...)
 {
@@ -45,9 +47,12 @@ void uftpd_logit(int severity, const char *fmt, ...)
 		file = stderr;
 
 	va_start(args, fmt);
+#ifndef UFTPD_EMBEDDED
 	if (uftpd_do_syslog)
 		vsyslog(severity, fmt, args);
-	else if (severity <= uftpd_loglevel) {
+	else
+#endif
+	if (severity <= uftpd_loglevel) {
 		if (uftpd_loglevel == LOG_DEBUG)
 			fprintf(file, "%d> ", getpid());
 		vfprintf(file, fmt, args);

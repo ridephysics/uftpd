@@ -1,6 +1,6 @@
 sbin_PROGRAMS      = uftpd
 uftpd_SOURCES      = uftpd.c uftpd.h common.c ftpcmd.c tftpcmd.c log.c
-uftpd_CPPFLAGS     = -D_GNU_SOURCE -D_BSD_SOURCE -D_DEFAULT_SOURCE
+uftpd_CPPFLAGS     = -D_GNU_SOURCE -D_BSD_SOURCE -D_DEFAULT_SOURCE -DUFTPD_PRIVATE
 uftpd_CFLAGS       = -W -Wall -Wextra -Wno-unused-parameter -std=gnu99
 uftpd_CFLAGS      += $(uev_CFLAGS) $(lite_CFLAGS)
 uftpd_LDADD        = $(uev_LIBS)   $(lite_LIBS)

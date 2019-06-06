@@ -418,11 +418,16 @@ static void handle_CWD(ctrl_t *ctrl, char *path)
 	 * entry is a file or directory.
 	 */
 	dir = uftpd_compose_abspath(ctrl, path);
-	if (!dir || stat(dir, &st) || !S_ISDIR(st.st_mode) || strlen(uftpd_home) > strlen(dir)) {
+	if (!dir || stat(dir, &st) || !S_ISDIR(st.st_mode)
+#ifndef UFTPD_EMBEDDED
+		|| strlen(uftpd_home) > strlen(dir)
+#endif
+	) {
 		send_msg(ctrl->sd, "550 No such directory.\r\n");
 		return;
 	}
 
+#ifndef UFTPD_EMBEDDED
 	if (!uftpd_chrooted) {
 		size_t len = strlen(uftpd_home);
 
@@ -430,6 +435,7 @@ static void handle_CWD(ctrl_t *ctrl, char *path)
 		    uftpd_home, dir, len, strlen(dir));
 		dir += len;
 	}
+#endif
 
 	snprintf(ctrl->cwd, sizeof(ctrl->cwd), "%s", dir);
 	if (ctrl->cwd[0] == 0)
@@ -1175,10 +1181,17 @@ static void handle_MDTM(ctrl_t *ctrl, char *file)
 	}
 
 	if (mtime) {
+#ifdef UFTPD_EMBEDDED
+		struct utimbuf times = {
+			0,
+			0
+		};
+#else
 		struct timespec times[2] = {
 			{ 0, UTIME_OMIT },
 			{ 0, 0 }
 		};
+#endif
 		struct tm tm;
 		int rc;
 
@@ -1188,8 +1201,13 @@ static void handle_MDTM(ctrl_t *ctrl, char *file)
 			return;
 		}
 
+#ifdef UFTPD_EMBEDDED
+		times.modtime = mktime(&tm);
+		rc = utime(path, &times);
+#else
 		times[1].tv_sec = mktime(&tm);
 		rc = utimensat(0, path, times, 0);
+#endif
 		if (rc) {
 			ERR(errno, "Failed setting MTIME %s of %s", mtime, file);
 			goto fail;
@@ -1546,11 +1564,13 @@ static ftp_cmd_t supported[] = {
 	{ NULL, NULL }
 };
 
+#ifndef UFTPD_EMBEDDED
 static void child_exit(uev_t *w, void *arg, int events)
 {
 	DBG("Child exiting ...");
 	uev_exit(w->ctx);
 }
+#endif
 
 static void read_client_command(uev_t *w, void *arg, int events)
 {
@@ -1592,7 +1612,9 @@ static void read_client_command(uev_t *w, void *arg, int events)
 
 static void ftp_command(ctrl_t *ctrl)
 {
+#ifndef UFTPD_EMBEDDED
 	uev_t sigterm_watcher;
+#endif
 
 	ctrl->bufsz = BUFFER_SIZE * sizeof(char);
 	ctrl->buf   = malloc(ctrl->bufsz);
@@ -1604,13 +1626,16 @@ static void ftp_command(ctrl_t *ctrl)
 	snprintf(ctrl->buf, ctrl->bufsz, "220 %s (%s) ready.\r\n", uftpd_prognm, VERSION);
 	send_msg(ctrl->sd, ctrl->buf);
 
+#ifndef UFTPD_EMBEDDED
 	uev_signal_init(ctrl->ctx, &sigterm_watcher, child_exit, NULL, SIGTERM);
+#endif
 	uev_io_init(ctrl->ctx, &ctrl->io_watcher, read_client_command, ctrl, ctrl->sd, UEV_READ);
 	uev_run(ctrl->ctx, 0);
 }
 
 int uftpd_ftp_session(uev_ctx_t *ctx, int sd)
 {
+	int rc;
 	int pid = 0;
 	ctrl_t *ctrl;
 	socklen_t len;
@@ -1651,7 +1676,12 @@ int uftpd_ftp_session(uev_ctx_t *ctx, int sd)
 	ftp_command(ctrl);
 
 	DBG("Client exiting, bye");
-	exit(uftpd_del_session(ctrl, 1));
+	rc = uftpd_del_session(ctrl, 1);
+#ifdef UFTPD_EMBEDDED
+	return rc;
+#else
+	exit(rc);
+#endif
 fail:
 	free(ctrl);
 	shutdown(sd, SHUT_RDWR);

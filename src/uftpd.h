@@ -18,7 +18,11 @@
 #ifndef UFTPD_H_
 #define UFTPD_H_
 
+#ifdef UFTPD_PRIVATE
+
+#ifndef UFTPD_EMBEDDED
 #include "config.h"
+#endif
 
 #include <arpa/inet.h>
 #include <dirent.h>
@@ -43,9 +47,28 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
-#include <syslog.h>
 #include <time.h>
 #include <unistd.h>
+
+#ifdef UFTPD_EMBEDDED
+#define	LOG_EMERG	0	/* system is unusable */
+#define	LOG_ALERT	1	/* action must be taken immediately */
+#define	LOG_CRIT	2	/* critical conditions */
+#define	LOG_ERR		3	/* error conditions */
+#define	LOG_WARNING	4	/* warning conditions */
+#define	LOG_NOTICE	5	/* normal but significant condition */
+#define	LOG_INFO	6	/* informational */
+#define	LOG_DEBUG	7	/* debug-level messages */
+
+#define	INTERNAL_NOPRI	0x10	/* the "no priority" priority */
+
+#define VERSION "2.8"
+
+#include <utime.h>
+#include <newlib_ext.h>
+#else
+#include <syslog.h>
+#endif
 
 #include <uev/uev.h>
 #include <lite/lite.h>
@@ -88,13 +111,15 @@
 #define INFO(fmt, args...)       LOGIT(LOG_INFO, 0, fmt, ##args)
 #define DBG(fmt, args...)        LOGIT(LOG_DEBUG, 0, fmt, ##args)
 
-extern char *uftpd_prognm;
+#ifndef UFTPD_EMBEDDED
 extern char *uftpd_home;		/* Server root/home directory       */
 extern int   uftpd_inetd;             /* Bool: conflicts with daemonize   */
 extern int   uftpd_chrooted;		/* Bool: are we chrooted?           */
+extern struct passwd *uftpd_pw;       /* FTP user's passwd entry          */
+#endif
+extern char *uftpd_prognm;
 extern int   uftpd_loglevel;
 extern int   uftpd_do_syslog;         /* Bool: False at daemon start      */
-extern struct passwd *uftpd_pw;       /* FTP user's passwd entry          */
 
 typedef struct tftphdr tftp_t;
 
@@ -160,8 +185,14 @@ int     uftpd_set_nonblock(int fd);
 int     uftpd_open_socket(int port, int type, char *desc);
 void    uftpd_convert_address(struct sockaddr_storage *ss, char *buf, size_t len);
 
+#ifndef UFTPD_EMBEDDED
 int     uftpd_loglvl(char *level);
+#endif
 void    uftpd_logit(int severity, const char *fmt, ...);
+
+#endif /* UFTPD_PRIVATE */
+
+int     uftpd_start(uev_ctx_t *ctx);
 
 #endif  /* UFTPD_H_ */
 
