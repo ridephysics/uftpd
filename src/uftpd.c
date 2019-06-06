@@ -186,7 +186,7 @@ static int init(uev_ctx_t *ctx)
 
 static void ftp_cb(uev_t *w, void *arg, int events)
 {
-        int client;
+	int client;
 
 	if (events & (UEV_ERROR | UEV_HUP)) {
 		uev_io_stop(w);
@@ -194,13 +194,13 @@ static void ftp_cb(uev_t *w, void *arg, int events)
 		return;
 	}
 
-        client = accept(w->fd, NULL, NULL);
-        if (client < 0) {
-                WARN(errno, "Failed accepting FTP client connection");
-                return;
-        }
+	client = accept(w->fd, NULL, NULL);
+	if (client < 0) {
+		WARN(errno, "Failed accepting FTP client connection");
+		return;
+	}
 
-        ftp_session(arg, client);
+	ftp_session(arg, client);
 }
 
 static void tftp_cb(uev_t *w, void *arg, int events)
@@ -266,15 +266,15 @@ static int serve_files(uev_ctx_t *ctx)
 
 static char *progname(char *arg0)
 {
-       char *nm;
+	char *nm;
 
-       nm = strrchr(arg0, '/');
-       if (nm)
-	       nm++;
-       else
-	       nm = arg0;
+	nm = strrchr(arg0, '/');
+	if (nm)
+		nm++;
+	else
+		nm = arg0;
 
-       return nm;
+	return nm;
 }
 
 int main(int argc, char **argv)
