@@ -1049,6 +1049,7 @@ static void do_RETR(uev_t *w, void *arg, int events)
 	ssize_t bytes;
 	size_t num;
 	char buf[BUFFER_SIZE];
+	size_t nwritten = 0;
 	int rc;
 
 	if (events & (UEV_ERROR | UEV_HUP)) {
@@ -1083,7 +1084,7 @@ static void do_RETR(uev_t *w, void *arg, int events)
 	}
 
 again:
-	bytes = send(ctrl->data_sd, buf, num, 0);
+	bytes = send(ctrl->data_sd, buf + nwritten, num - nwritten, 0);
 	if (-1 == bytes) {
 		if (ECONNRESET == errno)
 			DBG("Connection reset by client.");
@@ -1103,6 +1104,11 @@ again:
 
 		do_abort(ctrl);
 		send_msg(ctrl->sd, "426 TCP connection was established but then broken!\r\n");
+	}
+
+	nwritten += bytes;
+	if (nwritten < num) {
+		goto again;
 	}
 }
 
